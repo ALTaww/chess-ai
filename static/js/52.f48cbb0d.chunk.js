@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkstockfish_web=self.webpackChunkstockfish_web||[]).push([[52],{52:(s,e,a)=>{a.r(e),a.d(e,{default:()=>n});var c=a(371);const l={};var r=a(579);const t=s=>{let{className:e}=s;return(0,r.jsx)("div",{className:(0,c.x)(l.AnalysisBoard,{},[e]),children:"\u041f\u043e\u043a\u0430 \u043d\u0438\u0447\u0435\u0433\u043e..."})},n=s=>{let{className:e}=s;return(0,r.jsx)("div",{children:(0,r.jsx)(t,{})})}}}]);
+//# sourceMappingURL=52.f48cbb0d.chunk.js.map
