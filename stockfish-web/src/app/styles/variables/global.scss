@@ -1,0 +1,30 @@
+:root {
+  --font-family-main: consolas, "Times New Roman", serif;
+  --font-size-m: 16px;
+  --font-line-m: 24px;
+  --font-m: var(--font-size-m) / var(--font-line-m) var(--font-family-main);
+
+  --font-size-l: 24px;
+  --font-line-l: 32px;
+  --font-l: var(--font-size-l) / var(--font-line-l) var(--font-family-main);
+
+  --font-size-xl: 32px;
+  --font-line-xl: 40px;
+  --font-xl: var(--font-size-xl) / var(--font-line-xl) var(--font-family-main);
+
+  // Размеры
+  --navbar-height: 50px;
+  --sidebar-width: 300px;
+  --sidebar-width-collapsed: 80px;
+
+  // Цвета
+  --bg-color: rgb(222 222 223);
+  --inverted-bg-color: rgb(12, 12, 94);
+  --primary-color: rgb(11 52 167);
+  --secondary-color: rgb(217, 231, 13);
+  --inverted-primary-color: rgb(8 207 8);
+  --inverted-secondary-color: rgb(8 119 8);
+
+  // Индексы
+  --modal-z-index: 10;
+}

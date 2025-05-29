@@ -1,0 +1,26 @@
+.Navbar {
+  width: 100%;
+  height: var(--navbar-height);
+  background: var(--inverted-bg-color);
+  display: flex;
+  align-items: center;
+  padding: 20px;
+}
+
+.items {
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+}
+
+.item {
+}
+
+.link {
+  margin-left: 10px;
+  opacity: 1;
+}
+
+.mainLink {
+  flex-grow: 1;
+}

@@ -1,0 +1,18 @@
+.MyChessboard {
+  display: flex;
+  justify-content: center;
+}
+
+.chessboardWrapper {
+  width: min(80%, 90vh);
+  max-width: 600px;
+}
+
+.buttons {
+  display: flex;
+  justify-content: center;
+
+  button {
+    margin: 0.5rem;
+  }
+}
