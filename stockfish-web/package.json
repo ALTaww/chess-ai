@@ -1,6 +1,7 @@
 {
   "name": "stockfish-web",
   "version": "0.1.0",
+  "homepage": "https://altaww.github.io/chess-ai",
   "private": true,
   "scripts": {
     "start": "react-scripts start",
