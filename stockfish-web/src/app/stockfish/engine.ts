@@ -2,22 +2,21 @@
 
 const MINIMUM_DEPTH = 1;
 const MAXIMUM_DEPTH = 24;
-const NUMBER_OF_THREADS = 4;
 
 type EngineMessage = {
-  /* сообщение движка stockfish в формате UCI */
+  /* исходное сообщение движка Stockfish */
   uciMessage: string;
-  /* найден лучший ход для текущей позиции в формате `e2e4`*/
+  /* найден лучший ход для текущей позиции: e2e4 */
   bestMove?: string;
-  /* найден лучший ход для противника в формате `e7e5` */
+  /* ход «ponder» для противника: e7e5 */
   ponder?: string;
-  /*  разница материального баланса в центипешках (ВАЖНО! Stockfish дает счет cp в зависимости от того, чей сейчас ход) */
+  /* оценка позиции (в пешечных единицах, ±cp/100) */
   positionEvaluation?: number;
-  /* количество ходов до мата */
+  /* количество полуходов до мата, если найден мат */
   possibleMate?: number;
-  /* лучшие найденные ходы */
+  /* строка с PV (последовательность ходов), разделёнными пробелами */
   pv?: string[];
-  /* количество полуходов, на которые двигатель смотрит вперед */
+  /* текущая глубина анализа */
   depth?: number;
 };
 
@@ -25,161 +24,231 @@ export type EngineMessageCallback = (msg: EngineMessage) => void;
 
 export default class Engine {
   private stockfish: Worker;
+  private isInitialized = false;
   private readyPromise: Promise<void>;
-  private resolveReady: (value: void | PromiseLike<void>) => void;
-  private abortController = new AbortController();
+  private resolveReady!: () => void;
   private messageCallbacks = new Set<EngineMessageCallback>();
-  private _depth: number;
+  private _depth = 5;
   private _thinkTime = 1000;
 
   constructor() {
     this.stockfish = new Worker("./stockfish.js");
-
-    // Создаем промис для отслеживания готовности
+    // создаём promise, который разрешится после получения первого 'readyok'
     this.readyPromise = new Promise((resolve) => {
       this.resolveReady = resolve;
     });
 
     this.initializeEngine();
-    this.setThreads(NUMBER_OF_THREADS);
   }
 
+  /**
+   * Первый handshake с движком:
+   * 1) Отправляем 'uci'
+   * 2) Ждём 'readyok'
+   *
+   * После получения первого 'readyok' флаг this.isInitialized станет true,
+   * и resolveReady() разрешит все методы, ожидающие готовности движка.
+   */
   private initializeEngine() {
-    // Добавляем обработчик ДО отправки сообщений
     this.stockfish.addEventListener("message", this.handleEngineMessage, {
-      signal: this.abortController.signal,
       once: false,
     });
 
+    // Запускаем UCI-режим
     this.stockfish.postMessage("uci");
+    // Спрашиваем, готов ли движок
     this.stockfish.postMessage("isready");
   }
 
   private handleEngineMessage = (e: MessageEvent) => {
-    console.log("Engine message:", e.data); // Логируем все сообщения
-    const msg = this.parseMessage(e.data);
-    // Оповещаем подписчиков
+    const data: string = e.data;
+    // Логируем raw-сообщения (можно отключить в production)
+    console.log("[Engine →]", data);
+
+    // Распарываем часть UCI-информации
+    const msg = this.parseMessage(data);
+    // Оповещаем всех внешних слушателей
     this.messageCallbacks.forEach((cb) => cb(msg));
 
-    if (e.data === "readyok") {
-      this.resolveReady(); // Разрешаем промис готовности
-      console.log("ENGINE IS READY!");
+    // Первый readyok после 'isready'
+    if (data === "readyok" && !this.isInitialized) {
+      this.isInitialized = true;
+      // Разрешаем този, кто ждёт initial ready
+      this.resolveReady();
+      console.log("ENGINE IS INITIALIZED AND READY!");
     }
   };
 
-  // Асинхронный метод ожидания готовности
-  private waitForReady(): Promise<void> {
-    return this.readyPromise;
+  /**
+   * Ждём, пока движок не ответит первым 'readyok'.
+   * Все вызовы setOption…() будут ждать именно эту promise.
+   */
+  private async waitForInitialReady(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.readyPromise;
+    }
   }
 
+  /**
+   * Парсинг любого UCI-сообщения из движка в наш формат EngineMessage.
+   */
   private parseMessage(data: string): EngineMessage {
+    const bestMove = data.match(/bestmove\s+(\S+)/)?.[1];
+    const ponder = data.match(/ponder\s+(\S+)/)?.[1];
+    const cpMatch = data.match(/score cp\s+(-?\d+)/);
+    const mateMatch = data.match(/score mate\s+(-?\d+)/);
+    const depthMatch = data.match(/info.*\bdepth\s+(\d+)/);
+    const pvMatch = data.match(/info.*\b pv\s+(.+)/);
+
     return {
       uciMessage: data,
-      bestMove: data.match(/bestmove\s+(\S+)/)?.[1],
-      ponder: data.match(/ponder\s+(\S+)/)?.[1],
-      positionEvaluation: this.parseEvaluation(data),
-      possibleMate: this.parseMate(data),
-      pv: data.match(/ pv\s+(.*)/)?.[1].split(" "),
-      depth: Number(data.match(/ depth\s+(\d+)/)?.[1]),
+      bestMove: bestMove || undefined,
+      ponder: ponder || undefined,
+      positionEvaluation: cpMatch ? parseInt(cpMatch[1], 10) / 100 : undefined,
+      possibleMate: mateMatch ? parseInt(mateMatch[1], 10) : undefined,
+      pv: pvMatch ? pvMatch[1].trim().split(/\s+/) : undefined,
+      depth: depthMatch ? Number(depthMatch[1]) : undefined,
     };
   }
 
-  private parseEvaluation(data: string): number | undefined {
-    const match = data.match(/cp\s+(-?\d+)/);
-    return match ? parseInt(match[1], 10) / 100 : undefined;
-  }
-
-  private parseMate(data: string): number | undefined {
-    const match = data.match(/mate\s+(-?\d+)/);
-    return match ? parseInt(match[1], 10) : undefined;
-  }
-
-  get depth() {
-    return this._depth;
-  }
-
-  get thinkTime() {
-    return this._thinkTime;
-  }
-
-  addMessageListener(callback: (msg: EngineMessage) => void) {
+  /**
+   * Добавляем внешнего слушателя — он будет получать каждый EngineMessage
+   */
+  addMessageListener(callback: EngineMessageCallback) {
     this.messageCallbacks.add(callback);
   }
 
-  removeMessageListener(callback: (msg: EngineMessage) => void) {
+  removeMessageListener(callback: EngineMessageCallback) {
     this.messageCallbacks.delete(callback);
   }
 
-  async evaluatePosition(fen: string, thinkTime?: number) {
-    console.log("evaluationg position...");
-    console.log("waiting for engine ready...");
-    await this.waitForReady();
-    console.log("promise is ready");
-
-    this.stop(); // Останавливаем предыдущий анализ
-
-    this.stockfish.postMessage(`position fen ${fen}`);
-
-    console.log("current depth is ", this.depth);
-    let goCommand = "go";
-    goCommand += ` depth ${this.depth}`;
-    goCommand += ` movetime ${thinkTime}`;
-
-    console.log("go command: ", goCommand);
-
-    this.stockfish.postMessage(goCommand);
-
-    // Автоматическая остановка по таймауту
-    // if (thinkTime) {
-    //   this.currentTimer = setTimeout(() => {
-    //     this.stop();
-    //   }, thinkTime);
-    // }
-  }
-
+  /**
+   * Отправка команды «остановиться» (прерывает текущий поиск).
+   */
   stop() {
-    // if (this.currentTimer) {
-    //   clearTimeout(this.currentTimer);
-    //   this.currentTimer = undefined;
-    // }
     this.stockfish.postMessage("stop");
   }
 
+  /**
+   * Полное завершение работы с движком:
+   * - Останавливаем все вычисления
+   * - Удаляем всех слушателей
+   * - Отправляем 'quit'
+   */
   terminate() {
     this.stop();
-    this.abortController.abort();
     this.stockfish.postMessage("quit");
     this.messageCallbacks.clear();
   }
 
-  // Дополнительные методы
-  setThinkTime(time: number) {
-    this._thinkTime = time;
+  /****************************
+   *   Методы установки опций  *
+   ****************************/
+
+  /**
+   * Устанавливает уровень навыка (Skill Level).
+   * Отложит команду, пока движок не станет ready впервые.
+   */
+  setSkillLevel(level: number) {
+    this.waitForInitialReady().then(() => {
+      this.stockfish.postMessage(`setoption name Skill Level value ${level}`);
+    });
   }
 
+  /**
+   * Устанавливает максимальную глубину поиска (UCI_option "Depth").
+   */
   setDepth(depth: number) {
     if (depth < MINIMUM_DEPTH) depth = MINIMUM_DEPTH;
     else if (depth > MAXIMUM_DEPTH) depth = MAXIMUM_DEPTH;
     this._depth = depth;
-    console.log(`depth of stockfish is set to ${this.depth}`);
+
+    this.waitForInitialReady().then(() => {
+      this.stockfish.postMessage(`setoption name Depth value ${depth}`);
+    });
+    console.log(`Новая глубина поиска: ${this._depth}`);
   }
 
-  setSkillLevel(level: number) {
-    this.stockfish.postMessage(`setoption name Skill Level value ${level}`);
+  /**
+   * Устанавливает «think time» — ограничение по времени (в миллисекундах).
+   * Само по себе значение не передаётся в setoption:
+   * мы будем использовать его в goCommand (или можно снять ограничение).
+   */
+  setThinkTime(time: number) {
+    this._thinkTime = time;
+    console.log(`Новое время на ход (миллисекунды): ${this._thinkTime}`);
   }
 
+  /**
+   * Потоки, которые движок может использовать (UCI_option "Threads").
+   *
+   */
   setThreads(threads: number) {
-    this.stockfish.postMessage(`setoption name Threads value ${threads}`);
+    this.waitForInitialReady().then(() => {
+      this.stockfish.postMessage(`setoption name Threads value ${threads}`);
+    });
   }
 
+  /**
+   * Сколько вариантов (MultiPV) возвращать.
+   */
   setMultiPV(n: number) {
-    this.stockfish.postMessage(`setoption name MultiPV value ${n}`);
+    this.waitForInitialReady().then(() => {
+      this.stockfish.postMessage(`setoption name MultiPV value ${n}`);
+    });
   }
 
+  /**
+   * Включает или отключает ограничение по рейтингу, и задаёт Elo.
+   * (UCI_option UCI_LimitStrength и UCI_Elo).
+   */
   setLimitStrength(limit: boolean, elo = 1320) {
-    this.stockfish.postMessage(
-      `setoption name UCI_LimitStrength value ${limit}`
-    );
-    this.stockfish.postMessage(`setoption name UCI_Elo value ${elo}`);
+    this.waitForInitialReady().then(() => {
+      this.stockfish.postMessage(
+        `setoption name UCI_LimitStrength value ${limit ? "true" : "false"}`
+      );
+      // Если limit=false, значение UCI_Elo всё равно «примется», но не будет влиять.
+      this.stockfish.postMessage(`setoption name UCI_Elo value ${elo}`);
+    });
+  }
+
+  /*********************************************
+   *    Основной метод: анализ позиции (go)     *
+   *********************************************/
+
+  /**
+   * Запрашивает от движка лучший ход для позиции FEN.
+   * Теперь каждый раз перед поиском мы:
+   *  1) Останавливаем предыдущий поиск (stop)
+   *  2) Посылаем 'ucinewgame', 'isready' → ждём нового 'readyok'
+   *  3) Устанавливаем позицию → «go depth N»
+   */
+  async evaluatePosition(fen: string) {
+    // Ждём, пока движок вообще инициализирован
+    await this.waitForInitialReady();
+
+    // 1) Прерываем предыдущий анализ (если он был)
+    this.stop();
+
+    // 2) Сбрасываем внутреннее состояние движка перед новым анализом
+    await new Promise<void>((resolve) => {
+      const onReadyForNewGame = (e: MessageEvent) => {
+        if (e.data === "readyok") {
+          this.stockfish.removeEventListener("message", onReadyForNewGame);
+          resolve();
+        }
+      };
+      this.stockfish.addEventListener("message", onReadyForNewGame);
+      this.stockfish.postMessage("ucinewgame");
+      this.stockfish.postMessage("isready");
+    });
+
+    // 3) Отправляем позицию
+    this.stockfish.postMessage(`position fen ${fen}`);
+
+    // 4) Формируем команду «go»
+    const goCommand = `go depth ${this._depth} movetime ${this._thinkTime}`;
+    console.log(`[Engine ←] ${goCommand}`);
+    this.stockfish.postMessage(goCommand);
   }
 }

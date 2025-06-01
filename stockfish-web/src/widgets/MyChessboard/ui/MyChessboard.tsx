@@ -7,7 +7,7 @@ import Chess from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { Piece, Square } from "react-chessboard/dist/chessboard/types";
 import { sounds } from "shared/lib/sounds/sounds";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { urlParams } from "shared/config/consts/urlParams";
 
 interface MyChessboardProps {
@@ -22,38 +22,29 @@ interface LevelsConfig {
   thinkTime: number;
   elo?: number;
   multiPV?: number;
-  threads?: number;
+  threads?: number; // лучше не использовать
 }
 
-// Уровни с комбинированными параметрами
 const levels: Record<string, LevelsConfig> = {
   easy: {
     text: "Легко 🤓",
-    skill: 2, // Минимальный уровень навыка
-    // elo: 1350, // Ограничение по рейтингу
-    depth: 5, // Ограниченная глубина
-    thinkTime: 500, // Малое время на ход
-    multiPV: 3,
+    skill: 2,
+    depth: 5,
+    thinkTime: 500,
   },
   normal: {
     text: "Нормально 🧐",
-    skill: 10, // Средний уровень
-    depth: 12, // Умеренная глубина
+    skill: 10,
+    depth: 12,
     thinkTime: 1000,
-    multiPV: 3, // Рассматривать несколько вариантов
   },
   hard: {
     text: "Сложно 😵",
-    skill: 20, // Максимальный уровень
-    depth: 22, // Глубокая аналитика
+    skill: 20,
+    depth: 22,
     thinkTime: 3000,
-    threads: 6, // Использовать больше потоков
-    multiPV: 1, // Только лучший вариант
   },
 };
-
-const MAX_ENGINE_THINK_TIME = 1000;
-const OPENING_MOVES = 10;
 
 export const MyChessboard = ({
   className,
@@ -81,20 +72,24 @@ export const MyChessboard = ({
   );
   const [stockfishLevel, setStockfishLevel] =
     useState<keyof typeof levels>("easy");
-  const [isOpening, setIsOpening] = useState(true);
 
+  // При смене уровня создаём (или перенастраиваем) движок
   useEffect(() => {
+    // Если старый engine существует, завершаем его
+    if (engineRef.current) {
+      engineRef.current.terminate();
+    }
+
     const engine = new Engine();
     engineRef.current = engine;
 
     const config = levels[stockfishLevel];
 
-    // Всегда сбрасываем ограничение силы перед настройкой
+    // Сбрасываем лимит по рейтингу и настраиваем skill/depth/threads/multiPV
     engine.setLimitStrength(false);
-
-    // Настройка параметров
     engine.setSkillLevel(config.skill);
     engine.setDepth(config.depth);
+    engine.setThinkTime(config.thinkTime);
 
     if (config.elo) {
       engine.setLimitStrength(true, config.elo);
@@ -106,98 +101,69 @@ export const MyChessboard = ({
 
     if (config.multiPV) {
       engine.setMultiPV(config.multiPV);
-    } else {
-      engine.setMultiPV(1);
     }
 
-    console.log(`Stockfish level set to: ${stockfishLevel}`, config);
-  }, [stockfishLevel, engineRef]);
+    console.log(`Stockfish уровень: ${stockfishLevel}`, config);
 
-  // Загрузить начальную позицию
+    return () => {
+      engine.terminate();
+      engineRef.current = null;
+    };
+  }, [stockfishLevel]);
+
+  // Загрузка начальной позиции в Chess.js
   useEffect(() => {
     game.load(defaultPosition);
   }, [defaultPosition, game]);
 
-  function selectBestMove(moves: string[]): string {
-    const randomness = 0.3;
-    // Чем выше randomness, тем более случайный выбор
-    const weights = moves.map((_, i) => Math.exp(-i * randomness));
-    const total = weights.reduce((a, b) => a + b, 0);
-    let random = Math.random() * total;
-
-    return (
-      moves.find((_, i) => {
-        random -= weights[i];
-        return random <= 0;
-      }) || moves[0]
-    );
-  }
-
-  function move(moveObj: { from: string; to: string; promotion?: string }) {
-    const moved: {
-      captured?: string;
-      color: "w" | "b";
-      from: Square;
-      to: Square;
-      san?: string;
-      piece: Piece;
-    } | null = game.move(moveObj);
-
+  function move(moveObj: {
+    from: string;
+    to: string;
+    promotion?: string;
+  }): boolean {
+    const moved = game.move(moveObj);
     setGamePosition(game.fen());
-    console.log(moved);
+
     if (moved === null) {
       return false;
     }
-
-    if (game.history().length >= OPENING_MOVES) {
-      setIsOpening(false);
-    }
-
     if (game.game_over() || game.in_draw()) {
       sounds.checkmateSound.play();
       return false;
     }
-
     if (game.in_check()) {
       sounds.checkSound.play();
       return true;
     }
-
     if (moved.san === "O-O-O" || moved.san === "O-O") {
       sounds.castlingSound.play();
       return true;
     }
-
     if (moved.captured) {
       sounds.captureSound.play();
       return true;
     }
-
     sounds.moveSound.play();
     return true;
   }
 
-  // Создаем уникальную ссылку на обработчик
+  // Обработчик ответов от Engine
   const handler: EngineMessageCallback = (message) => {
-    console.log(message);
-    console.log("Best move received:", message.bestMove);
+    console.log("[React ← EngineMessage]", message);
 
     const engine = engineRef.current;
+    if (!engine) return;
 
-    const variants: string[] = [];
-
-    if (message.pv && message.bestMove) {
-      variants.push(message.bestMove);
-
-      const selectedMove = selectBestMove(variants);
-
+    if (message.bestMove) {
+      // Если есть лучший ход — сразу его выполняем
+      const selectedMove = message.bestMove;
       const moveResult = move({
         from: selectedMove.substring(0, 2),
         to: selectedMove.substring(2, 4),
-        promotion: selectedMove.substring(4, 5),
+        promotion:
+          selectedMove.length > 4 ? selectedMove.substring(4, 5) : undefined,
       });
 
-      // Удаляем обработчик независимо от результата хода
       engine.removeMessageListener(handler);
 
       if (!moveResult) {
@@ -208,35 +174,28 @@ export const MyChessboard = ({
 
   async function findBestMove() {
     const engine = engineRef.current;
-    // Добавляем обработчик перед запуском анализа
+    if (!engine) return;
+
+    // Добавляем слушатель перед новой оценкой
     engine.addMessageListener(handler);
-    console.log("finding best move...");
+    console.log("Запрос лучшего хода…");
 
     try {
-      await engine.evaluatePosition(
-        game.fen(),
-        isOpening ? Math.ceil(MAX_ENGINE_THINK_TIME / 2) : MAX_ENGINE_THINK_TIME
-      );
+      await engine.evaluatePosition(game.fen());
     } catch (error) {
       engine.removeMessageListener(handler);
       throw error;
     }
   }
 
-  // Очистка при размонтировании
-  useEffect(() => {
-    return () => engineRef.current.terminate();
-  }, [engineRef]);
-
   function onDrop(sourceSquare: Square, targetSquare: Square, piece: Piece) {
-    console.log(sourceSquare, targetSquare, piece);
+    console.log(`[Player move] ${sourceSquare} → ${targetSquare}`, piece);
     const notEnd = move({
       from: sourceSquare,
       to: targetSquare,
       promotion: piece[1].toLowerCase(),
     });
 
-    // Задержка чтобы компьютер не ходил моментально
     if (notEnd) {
       setTimeout(() => {
         findBestMove();
@@ -246,13 +205,13 @@ export const MyChessboard = ({
   }
 
   return (
-    <div className={classNames(cls.MyChessboard, {}, [className])}>
+    <div className={classNames(cls.MyChessboard, {}, [className || ""])}>
       <div className={cls.chessboardWrapper}>
         <div className={cls.buttons}>
           {Object.entries(levels).map(([level, config]) => (
             <Button
-              key={`${level}`}
-              onClick={() => setStockfishLevel(level)}
+              key={level}
+              onClick={() => setStockfishLevel(level as keyof typeof levels)}
               theme={ButtonTheme.CLASSIC}
               active={stockfishLevel === level}
             >
