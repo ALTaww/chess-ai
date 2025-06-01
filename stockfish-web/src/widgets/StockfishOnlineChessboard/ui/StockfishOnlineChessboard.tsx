@@ -9,6 +9,7 @@ import { sounds } from "shared/lib/sounds/sounds";
 import { useLocation } from "react-router-dom";
 import { urlParams } from "shared/config/consts/urlParams";
 import axios from "axios";
+import { createNewAbortController } from "shared/lib/createNewAbortController/createNewAbortController";
 
 interface StockfishOnlineChessboardProps {
   className?: string;
@@ -89,6 +90,7 @@ export const StockfishOnlineChessboard = ({
   const [stockfishLevel, setStockfishLevel] =
     useState<keyof typeof levels>("easy");
 
+  const abortControllerRef = useRef<AbortController>(null);
   // Загрузить начальную позицию
   useEffect(() => {
     game.load(defaultPosition);
@@ -136,12 +138,16 @@ export const StockfishOnlineChessboard = ({
 
   async function findBestMove() {
     try {
-      // По хорошему ещё добавить abortController
+      const { controller, signal } =
+        createNewAbortController(abortControllerRef);
+      abortControllerRef.current = controller;
+
       const { data } = await axios.get<ApiResponse>(API_URL, {
         params: {
           fen: game.fen(),
           depth: levels[stockfishLevel].depth,
         },
+        signal: signal,
       });
 
       console.log(data);
@@ -162,6 +168,8 @@ export const StockfishOnlineChessboard = ({
       });
     } catch (error) {
       throw error;
+    } finally {
+      abortControllerRef.current = null;
     }
   }
 
