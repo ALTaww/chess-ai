@@ -4,13 +4,15 @@
 
 Этот проект был запущен с помощью [Create React App](https://github.com/facebook/create-react-app).
 
+Используется методология [feature-sliced design](https://feature-sliced.github.io/documentation/)
+
 ## Перед установкой
 
 Для того чтобы запустить проект на локальной машине вам необходимо установить [Node.js](https://nodejs.org/en)
 
 ## Доступные скрипты
 
-В каталоге проекта ($ cd stockfish-web) вы можете запустить:
+В каталоге проекта (`$ cd stockfish-web`) вы можете запустить:
 
 ### `npm install`
 
