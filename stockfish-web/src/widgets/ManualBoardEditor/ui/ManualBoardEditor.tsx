@@ -5,20 +5,10 @@ import {
   ChessboardDnDProvider,
   SparePiece,
 } from "react-chessboard";
-import {
-  BoardOrientation,
-  Piece,
-} from "react-chessboard/dist/chessboard/types";
-import {
-  ChangeEvent,
-  InputHTMLAttributes,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { Piece } from "react-chessboard/dist/chessboard/types";
+import { useMemo, useState } from "react";
 import Chess from "chess.js";
 import { Button } from "shared/ui/Button/Button";
-import { Input } from "shared/ui/Input/Input";
 import { FenInput } from "shared/ui/FenInput/FenInput";
 
 interface ManualBoardEditorProps {
@@ -141,12 +131,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
             ))}
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
+        <div className={cls.buttons}>
           <Button
             onClick={() => {
               game.reset();

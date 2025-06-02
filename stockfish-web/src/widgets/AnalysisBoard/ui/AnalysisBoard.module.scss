@@ -11,8 +11,18 @@
 .buttons {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
 
   button {
     margin: 0.5rem;
   }
+}
+
+.bestLine {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

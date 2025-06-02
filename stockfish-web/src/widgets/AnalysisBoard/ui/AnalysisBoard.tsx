@@ -192,11 +192,11 @@ export const AnalysisBoard = ({
       <div className={cls.chessboardWrapper}>
         <h4>
           Оценка позиции:{" "}
-          {possibleMate ? `#${possibleMate}` : positionEvaluation}
+          {possibleMate ? `#${possibleMate}` : positionEvaluation.toFixed(4)}
           {"; "}
           Глубина: {depth}
         </h4>
-        <h5>
+        <h5 className={cls.bestLine}>
           Лучшая линия: <i>{bestLine.slice(0, 10).join(" ")}</i> ...
         </h5>
         <FenInput
