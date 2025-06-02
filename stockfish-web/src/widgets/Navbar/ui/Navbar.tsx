@@ -28,6 +28,11 @@ export const Navbar = ({ className }: NavbarProps) => {
           </AppLink>
         </div>
         <div className={cls.item}>
+          <AppLink theme={AppLinkTheme.SECONDARY} to={RoutePath.my_chess_ai}>
+            <span className={cls.link}>Простой ии</span>
+          </AppLink>
+        </div>
+        <div className={cls.item}>
           <AppLink
             theme={AppLinkTheme.SECONDARY}
             to={RoutePath.stockfish_online}

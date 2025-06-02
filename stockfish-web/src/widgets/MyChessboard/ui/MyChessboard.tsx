@@ -10,7 +10,6 @@ import { sounds } from "shared/lib/sounds/sounds";
 import { useLocation } from "react-router-dom";
 import { urlParams } from "shared/config/consts/urlParams";
 import { Modal } from "shared/ui/Modal/Modal";
-import { Input } from "shared/ui/Input/Input";
 import { FenInput } from "shared/ui/FenInput/FenInput";
 
 interface MyChessboardProps {

@@ -9,6 +9,16 @@ const MainPage = ({ className }: MainPageProps) => {
   return (
     <div>
       <p>
+        Страница <Link to={RoutePath.my_chess_ai}>"Простой ии"</Link> - ручной
+        движок, не использующий существующие.
+        <br />
+        Работает по принципу:
+        <br /> 1. Оценка позиции
+        <br /> 2. Дерево поиска с помощью Minimax
+        <br /> 3. Альфа-бета-обрезка
+      </p>
+      <br />
+      <p>
         Страница <Link to={RoutePath.stockfish_online}>"Stockfish online"</Link>{" "}
         - Играть со стокфишем в через api stockfish.online.
       </p>
@@ -25,6 +35,7 @@ const MainPage = ({ className }: MainPageProps) => {
         Страница <Link to={RoutePath.board_editor}>"Редактор доски"</Link> -
         расставить нужную позицию на пустой доске
       </p>
+
       <br />
       <p>
         На всех страницах есть поле ввода fen строки, вы можете например
