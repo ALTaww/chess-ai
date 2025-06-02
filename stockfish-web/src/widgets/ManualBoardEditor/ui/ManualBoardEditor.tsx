@@ -153,7 +153,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
               setFenPosition(game.fen());
             }}
           >
-            Start position ♟️
+            Начальная позиция ♟️
           </Button>
           <Button
             onClick={() => {
@@ -161,7 +161,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
               setFenPosition(game.fen());
             }}
           >
-            Clear board 🗑️
+            Очистить доску 🗑️
           </Button>
           <Button
             onClick={() => {
@@ -170,10 +170,12 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
               );
             }}
           >
-            Flip board 🔁
+            Перевернуть доску 🔁
           </Button>
         </div>
         <FenInput fenPosition={fenPosition} onChange={handleFenInputChange} />
+        <p>Чтобы удалить фигуру из доски - вынесите её за пределы</p>
+        <p>Чтобы первыми ходили черные - в поле ввода замените w на b</p>
       </ChessboardDnDProvider>
     </div>
   );

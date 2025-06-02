@@ -2,6 +2,7 @@ import { classNames } from "shared/lib/classNames/classNames";
 import { AppLink, AppLinkTheme } from "shared/ui/AppLink/AppLink";
 import cls from "./Navbar.module.scss";
 import { RoutePath } from "shared/config/routeConfig/routeConfig";
+import GithubImg from "shared/assets/github-mark-white.png";
 
 interface NavbarProps {
   className?: string;
@@ -11,6 +12,16 @@ export const Navbar = ({ className }: NavbarProps) => {
   return (
     <div className={classNames(cls.Navbar, {}, [className])}>
       <div className={cls.items}>
+        <div className={`${cls.item}`} style={{ padding: "0 5px" }}>
+          <a
+            className={cls.link}
+            href="https://github.com/ALTaww/chess-ai"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img src={GithubImg} alt="Github repo" width={18} height={18} />
+          </a>
+        </div>
         <div className={`${cls.item} ${cls.mainLink}`}>
           <AppLink theme={AppLinkTheme.SECONDARY} to={RoutePath.main}>
             <span className={cls.link}>Главная страница</span>

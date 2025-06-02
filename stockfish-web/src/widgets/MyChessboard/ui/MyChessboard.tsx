@@ -75,6 +75,9 @@ export const MyChessboard = ({
   );
   const [stockfishLevel, setStockfishLevel] =
     useState<keyof typeof levels>("easy");
+  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
+    "white"
+  );
 
   // При смене уровня создаём (или перенастраиваем) движок
   useEffect(() => {
@@ -242,6 +245,7 @@ export const MyChessboard = ({
           id="PlayVsStockfish"
           position={gamePosition}
           onPieceDrop={onDrop}
+          boardOrientation={boardOrientation}
         />
 
         <div className={cls.buttons}>
@@ -261,6 +265,22 @@ export const MyChessboard = ({
             }}
           >
             Назад
+          </Button>
+          <Button
+            onClick={() => {
+              setBoardOrientation(
+                boardOrientation === "black" ? "white" : "black"
+              );
+            }}
+          >
+            Перевернуть доску
+          </Button>
+          <Button
+            onClick={() => {
+              findBestMove();
+            }}
+          >
+            Ходи
           </Button>
         </div>
         <FenInput fenPosition={gamePosition} onChange={handleFenInputChange} />

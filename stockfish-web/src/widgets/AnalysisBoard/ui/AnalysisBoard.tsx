@@ -17,8 +17,8 @@ interface AnalysisBoardProps {
 
 interface LevelsConfig {
   skill: number;
-  depth?: number;
-  thinkTime?: number;
+  depth: number;
+  thinkTime: number;
   elo?: number;
   multiPV?: number;
   threads?: number;
@@ -27,8 +27,8 @@ interface LevelsConfig {
 // Уровни с комбинированными параметрами
 const level: LevelsConfig = {
   skill: 20, // Максимальный уровень
-  depth: 20,
-  thinkTime: 10000,
+  depth: 245, // Максимальная глубина
+  thinkTime: 10000, // 10 сек
 };
 
 export const AnalysisBoard = ({
@@ -45,6 +45,10 @@ export const AnalysisBoard = ({
   const [depth, setDepth] = useState(10);
   const [bestLine, setBestline] = useState<string[]>([]);
   const [possibleMate, setPossibleMate] = useState<number | null>(null);
+  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
+    "white"
+  );
+
   useEffect(() => {
     // Если старый engine существует, завершаем его
     if (engineRef.current) {
@@ -218,6 +222,7 @@ export const AnalysisBoard = ({
                 ]
               : undefined
           }
+          boardOrientation={boardOrientation}
         />
         <div className={cls.buttons}>
           <Button
@@ -239,9 +244,26 @@ export const AnalysisBoard = ({
               setBestline([]);
               game.undo();
               setChessBoardPosition(game.fen());
+              findBestMove();
             }}
           >
             Назад
+          </Button>
+          <Button
+            onClick={() => {
+              setBoardOrientation(
+                boardOrientation === "black" ? "white" : "black"
+              );
+            }}
+          >
+            Перевернуть доску
+          </Button>
+          <Button
+            onClick={() => {
+              findBestMove();
+            }}
+          >
+            Анализируй
           </Button>
         </div>
       </div>

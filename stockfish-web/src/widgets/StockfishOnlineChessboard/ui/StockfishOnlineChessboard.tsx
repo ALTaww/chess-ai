@@ -91,6 +91,9 @@ export const StockfishOnlineChessboard = ({
   const [gamePosition, setGamePosition] = useState(defaultPosition);
   const [stockfishLevel, setStockfishLevel] =
     useState<keyof typeof levels>("easy");
+  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
+    "white"
+  );
 
   const abortControllerRef = useRef<AbortController>(null);
   // Загрузить начальную позицию
@@ -227,6 +230,7 @@ export const StockfishOnlineChessboard = ({
           id="chessboard"
           position={gamePosition}
           onPieceDrop={onDrop}
+          boardOrientation={boardOrientation}
         />
 
         <div className={cls.buttons}>
@@ -246,6 +250,22 @@ export const StockfishOnlineChessboard = ({
             }}
           >
             Назад
+          </Button>
+          <Button
+            onClick={() => {
+              setBoardOrientation(
+                boardOrientation === "black" ? "white" : "black"
+              );
+            }}
+          >
+            Перевернуть доску
+          </Button>
+          <Button
+            onClick={() => {
+              findBestMove();
+            }}
+          >
+            Ходи
           </Button>
         </div>
         <FenInput fenPosition={gamePosition} onChange={handleFenInputChange} />
