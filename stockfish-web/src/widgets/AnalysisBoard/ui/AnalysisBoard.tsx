@@ -1,254 +1,272 @@
 import { classNames } from "shared/lib/classNames/classNames";
 import cls from "./AnalysisBoard.module.scss";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Engine, { EngineMessageCallback } from "app/stockfish/engine";
+import Chess from "chess.js";
+import { Button, ButtonTheme } from "shared/ui/Button/Button";
+import { Chessboard } from "react-chessboard";
+import { Piece, Square } from "react-chessboard/dist/chessboard/types";
+import { sounds } from "shared/lib/sounds/sounds";
+import { FenInput } from "shared/ui/FenInput/FenInput";
+import { Modal } from "shared/ui/Modal/Modal";
 
 interface AnalysisBoardProps {
   className?: string;
+  defaultPosition?: string;
 }
 
-export const AnalysisBoard = ({ className }: AnalysisBoardProps) => {
+interface LevelsConfig {
+  skill: number;
+  depth?: number;
+  thinkTime?: number;
+  elo?: number;
+  multiPV?: number;
+  threads?: number;
+}
+
+// Уровни с комбинированными параметрами
+const level: LevelsConfig = {
+  skill: 20, // Максимальный уровень
+  depth: 20,
+  thinkTime: 10000,
+};
+
+export const AnalysisBoard = ({
+  className,
+  defaultPosition,
+}: AnalysisBoardProps) => {
+  const game = useMemo(() => new Chess(), []);
+
+  const engineRef = useRef<Engine | null>(null);
+  const [chessBoardPosition, setChessBoardPosition] = useState(
+    defaultPosition || game.fen()
+  );
+  const [positionEvaluation, setPositionEvaluation] = useState(0);
+  const [depth, setDepth] = useState(10);
+  const [bestLine, setBestline] = useState<string[]>([]);
+  const [possibleMate, setPossibleMate] = useState<number | null>(null);
+  useEffect(() => {
+    // Если старый engine существует, завершаем его
+    if (engineRef.current) {
+      engineRef.current.terminate();
+    }
+
+    const engine = new Engine();
+    engineRef.current = engine;
+
+    const config = level;
+
+    // Сбрасываем лимит по рейтингу и настраиваем skill/depth/threads/multiPV
+    engine.setSkillLevel(config.skill);
+    engine.setDepth(config.depth);
+    engine.setThinkTime(config.thinkTime);
+
+    if (config.elo) {
+      engine.setLimitStrength(true, config.elo);
+    }
+
+    if (config.threads) {
+      engine.setThreads(config.threads);
+    }
+
+    if (config.multiPV) {
+      engine.setMultiPV(config.multiPV);
+    }
+
+    findBestMove();
+
+    return () => {
+      engine.terminate();
+      engineRef.current = null;
+    };
+  }, []);
+
+  function move(moveObj: {
+    from: string;
+    to: string;
+    promotion?: string;
+  }): boolean {
+    const moved = game.move(moveObj);
+    setChessBoardPosition(game.fen());
+
+    if (moved === null) {
+      return false;
+    }
+    if (game.game_over() || game.in_draw()) {
+      sounds.checkmateSound.play();
+      setIsGameOverModal(true);
+      return false;
+    }
+    if (game.in_check()) {
+      sounds.checkSound.play();
+      return true;
+    }
+    if (moved.san === "O-O-O" || moved.san === "O-O") {
+      sounds.castlingSound.play();
+      return true;
+    }
+    if (moved.captured) {
+      sounds.captureSound.play();
+      return true;
+    }
+    sounds.moveSound.play();
+    return true;
+  }
+
+  // Обработчик ответов от Engine
+  const handler: EngineMessageCallback = (message) => {
+    // console.log("[React ← EngineMessage]", message);
+
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const { depth, positionEvaluation, possibleMate, pv } = message;
+
+    if (depth && depth < 10) return;
+    positionEvaluation &&
+      setPositionEvaluation(
+        ((game.turn() === "w" ? 1 : -1) * Number(positionEvaluation)) / 100
+      );
+    possibleMate && setPossibleMate(possibleMate);
+    depth && setDepth(depth);
+    pv && setBestline(pv);
+  };
+
+  const findBestMove = async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    // Добавляем слушатель перед новой оценкой
+    engine.addMessageListener(handler);
+    console.log("Запрос лучшего хода…");
+
+    try {
+      await engine.evaluatePosition(game.fen());
+    } catch (error) {
+      engine.removeMessageListener(handler);
+      throw error;
+    }
+  };
+
+  function onDrop(sourceSquare: Square, targetSquare: Square, piece: Piece) {
+    const notEnd = move({
+      from: sourceSquare,
+      to: targetSquare,
+      promotion: piece[1].toLowerCase(),
+    });
+    setPossibleMate(null);
+
+    setBestline([]);
+
+    if (notEnd) {
+      findBestMove();
+    }
+    return true;
+  }
+
+  const bestMove = bestLine[0];
+  const handleFenInputChange = (fen: string) => {
+    const { valid } = game.validate_fen(fen);
+    if (valid) {
+      game.load(fen);
+      setChessBoardPosition(game.fen());
+      setBestline([]);
+      setPossibleMate(null);
+      setDepth(null);
+      findBestMove();
+    }
+  };
+
+  const [isGameOverModal, setIsGameOverModal] = useState(false);
+
+  const onToggleModal = useCallback(() => {
+    setIsGameOverModal(!isGameOverModal);
+  }, [isGameOverModal]);
+
   return (
     <div className={classNames(cls.AnalysisBoard, {}, [className])}>
-      Пока ничего...
+      <div className={cls.chessboardWrapper}>
+        <h4>
+          Оценка позиции:{" "}
+          {possibleMate ? `#${possibleMate}` : positionEvaluation}
+          {"; "}
+          Глубина: {depth}
+        </h4>
+        <h5>
+          Лучшая линия: <i>{bestLine.slice(0, 10).join(" ")}</i> ...
+        </h5>
+        <FenInput
+          fenPosition={chessBoardPosition}
+          onChange={handleFenInputChange}
+        />
+        <Chessboard
+          id="AnalysisBoard"
+          position={chessBoardPosition}
+          onPieceDrop={onDrop}
+          customBoardStyle={{
+            borderRadius: "4px",
+            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
+          }}
+          customArrows={
+            bestMove
+              ? [
+                  [
+                    bestMove.substring(0, 2) as Square,
+                    bestMove.substring(2, 4) as Square,
+                    "rgb(0, 128, 0)",
+                  ],
+                ]
+              : undefined
+          }
+        />
+        <div className={cls.buttons}>
+          <Button
+            theme={ButtonTheme.CLASSIC}
+            onClick={() => {
+              setPossibleMate(null);
+              setBestline([]);
+              game.reset();
+              setChessBoardPosition(game.fen());
+              findBestMove();
+            }}
+          >
+            Начальная позиция
+          </Button>
+          <Button
+            theme={ButtonTheme.CLASSIC}
+            onClick={() => {
+              setPossibleMate(null);
+              setBestline([]);
+              game.undo();
+              setChessBoardPosition(game.fen());
+            }}
+          >
+            Назад
+          </Button>
+        </div>
+      </div>
+      <Modal isOpen={isGameOverModal} onClose={onToggleModal}>
+        <p>Игра окончена!</p>
+        <div className={cls.buttons}>
+          <Button
+            onClick={() => {
+              game.reset();
+              setChessBoardPosition(game.fen());
+              setIsGameOverModal(false);
+              findBestMove();
+            }}
+          >
+            Новая игра
+          </Button>
+          <Button
+            onClick={() => {
+              setIsGameOverModal(false);
+            }}
+          >
+            Назад
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
-
-// import { classNames } from "shared/lib/classNames/classNames";
-// import cls from "./AnalysisBoard.module.scss";
-// import { useEffect, useMemo, useRef, useState } from "react";
-// import Engine, { EngineMessageCallback } from "app/stockfish/engine";
-// import Chess from "chess.js";
-// import { Button } from "shared/ui/Button/Button";
-// import { Chessboard } from "react-chessboard";
-// import { Square } from "react-chessboard/dist/chessboard/types";
-
-// interface AnalysisBoardProps {
-//   className?: string;
-// }
-
-// interface LevelsConfig {
-//   text: string;
-//   skill: number;
-//   depth: number;
-//   thinkTime: number;
-//   elo?: number;
-//   multiPV?: number;
-//   threads?: number;
-// }
-
-// // Уровни с комбинированными параметрами
-// const levels: Record<string, LevelsConfig> = {
-//   hard: {
-//     text: "Сложно 😵",
-//     skill: 20, // Максимальный уровень
-//     depth: 22, // Глубокая аналитика
-//     thinkTime: 3000,
-//     threads: 6, // Использовать больше потоков
-//     multiPV: 1, // Только лучший вариант
-//   },
-// };
-
-// export const AnalysisBoard = ({ className }: AnalysisBoardProps) => {
-//   const engine = useMemo(() => new Engine(), []);
-//   const game = useMemo(() => new Chess(), []);
-//   const inputRef = useRef<HTMLInputElement>(null);
-//   const [chessBoardPosition, setChessBoardPosition] = useState(game.fen());
-//   const [positionEvaluation, setPositionEvaluation] = useState(0);
-//   const [depth, setDepth] = useState(10);
-//   const [bestLine, setBestline] = useState("");
-//   const [possibleMate, setPossibleMate] = useState("");
-
-//   const config: LevelsConfig = {
-//     text: "Сложно 😵",
-//     skill: 20, // Максимальный уровень
-//     depth: 22, // Глубокая аналитика
-//     thinkTime: 3000,
-//     threads: 6, // Использовать больше потоков
-//     multiPV: 1, // Только лучший вариант
-//   };
-
-//   useEffect(() => {
-//     const config = levels["hard"];
-
-//     // Всегда сбрасываем ограничение силы перед настройкой
-//     engine.setLimitStrength(false);
-
-//     // Настройка параметров
-//     engine.setSkillLevel(config.skill);
-//     engine.setDepth(config.depth);
-
-//     if (config.elo) {
-//       engine.setLimitStrength(true, config.elo);
-//     }
-
-//     if (config.threads) {
-//       engine.setThreads(config.threads);
-//     }
-
-//     if (config.multiPV) {
-//       engine.setMultiPV(config.multiPV);
-//     } else {
-//       engine.setMultiPV(1);
-//     }
-//   }, [engine]);
-
-//   // Создаем уникальную ссылку на обработчик
-//   const handler: EngineMessageCallback = (message) => {
-//     const { positionEvaluation, possibleMate, pv, depth } = message;
-
-//     if (depth && depth < 10) return;
-//     positionEvaluation &&
-//       setPositionEvaluation(
-//         ((game.turn() === "w" ? 1 : -1) * Number(positionEvaluation)) / 100
-//       );
-//     possibleMate && setPossibleMate(`${possibleMate}`);
-//     depth && setDepth(depth);
-//     pv && setBestline(pv);
-
-//     console.log(message);
-//     console.log("Best move received:", message.bestMove);
-
-//     const variants: string[] = [];
-
-//     if (message.pv && message.bestMove) {
-//       variants.push(message.bestMove);
-
-//       const selectedMove = selectBestMove(variants);
-
-//       const moveResult = move({
-//         from: selectedMove.substring(0, 2),
-//         to: selectedMove.substring(2, 4),
-//         promotion: selectedMove.substring(4, 5),
-//       });
-
-//       // Удаляем обработчик независимо от результата хода
-//       engine.removeMessageListener(handler);
-
-//       if (!moveResult) {
-//         engine.stop();
-//       }
-//     }
-//   };
-
-//   async function findBestMove() {
-//     // Добавляем обработчик перед запуском анализа
-//     engine.addMessageListener(handler);
-//     console.log("finding best move...");
-
-//     try {
-//       await engine.evaluatePosition(game.fen(), config.thinkTime);
-//     } catch (error) {
-//       engine.removeMessageListener(handler);
-//       throw error;
-//     }
-//   }
-
-//   // function findBestMove() {
-//   //   engine.evaluatePosition(chessBoardPosition, 18);
-//   //   engine.onMessage(({ positionEvaluation, possibleMate, pv, depth }) => {
-//   //     if (depth && depth < 10) return;
-//   //     positionEvaluation &&
-//   //       setPositionEvaluation(
-//   //         ((game.turn() === "w" ? 1 : -1) * Number(positionEvaluation)) / 100
-//   //       );
-//   //     possibleMate && setPossibleMate(possibleMate);
-//   //     depth && setDepth(depth);
-//   //     pv && setBestline(pv);
-//   //   });
-//   // }
-
-//   function onDrop(sourceSquare, targetSquare, piece) {
-//     const move = game.move({
-//       from: sourceSquare,
-//       to: targetSquare,
-//       promotion: piece[1].toLowerCase() ?? "q",
-//     });
-//     setPossibleMate("");
-//     setChessBoardPosition(game.fen());
-
-//     // illegal move
-//     if (move === null) return false;
-//     engine.stop();
-//     setBestline("");
-//     if (game.game_over() || game.in_draw()) return false;
-//     return true;
-//   }
-
-//   useEffect(() => {
-//     if (!game.game_over() || game.in_draw()) {
-//       findBestMove();
-//     }
-//   }, [chessBoardPosition]);
-
-//   const bestMove = bestLine?.split(" ")?.[0];
-//   const handleFenInputChange = (e) => {
-//     const { valid } = game.validate_fen(e.target.value);
-//     if (valid && inputRef.current) {
-//       inputRef.current.value = e.target.value;
-//       game.load(e.target.value);
-//       setChessBoardPosition(game.fen());
-//     }
-//   };
-
-//   return (
-//     <div className={classNames(cls.AnalysisBoard, {}, [className])}>
-//       <h4>
-//         Position Evaluation:{" "}
-//         {possibleMate ? `#${possibleMate}` : positionEvaluation}
-//         {"; "}
-//         Depth: {depth}
-//       </h4>
-//       <h5>
-//         Best line: <i>{bestLine.slice(0, 40)}</i> ...
-//       </h5>
-//       <input
-//         ref={inputRef}
-//         style={{
-//           width: "90%",
-//         }}
-//         onChange={handleFenInputChange}
-//         placeholder="Paste FEN to start analysing custom position"
-//       />
-//       <Chessboard
-//         id="AnalysisBoard"
-//         position={chessBoardPosition}
-//         onPieceDrop={onDrop}
-//         customBoardStyle={{
-//           borderRadius: "4px",
-//           boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
-//         }}
-//         customArrows={
-//           bestMove
-//             ? [
-//                 [
-//                   bestMove.substring(0, 2) as Square,
-//                   bestMove.substring(2, 4) as Square,
-//                   "rgb(0, 128, 0)",
-//                 ],
-//               ]
-//             : undefined
-//         }
-//       />
-//       <button
-//         onClick={() => {
-//           setPossibleMate("");
-//           setBestline("");
-//           game.reset();
-//           setChessBoardPosition(game.fen());
-//         }}
-//       >
-//         reset
-//       </button>
-//       <Button
-//         onClick={() => {
-//           setPossibleMate("");
-//           setBestline("");
-//           game.undo();
-//           setChessBoardPosition(game.fen());
-//         }}
-//       >
-//         undo
-//       </Button>
-//     </div>
-//   );
-// };

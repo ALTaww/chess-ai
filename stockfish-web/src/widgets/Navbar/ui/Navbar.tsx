@@ -34,6 +34,11 @@ export const Navbar = ({ className }: NavbarProps) => {
             <span className={cls.link}>Анализировать позицию</span>
           </AppLink>
         </div>
+        <div className={cls.item}>
+          <AppLink theme={AppLinkTheme.SECONDARY} to={RoutePath.board_editor}>
+            <span className={cls.link}>Редактор доски</span>
+          </AppLink>
+        </div>
       </div>
     </div>
   );

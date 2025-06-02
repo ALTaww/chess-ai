@@ -1,7 +1,7 @@
 import { classNames } from "shared/lib/classNames/classNames";
 import cls from "./StockfishOnlineChessboard.module.scss";
 import { Button, ButtonTheme } from "shared/ui/Button/Button";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Chess from "chess.js";
 import { Chessboard, ChessboardDnDProvider } from "react-chessboard";
 import { Piece, Square } from "react-chessboard/dist/chessboard/types";
@@ -10,6 +10,8 @@ import { useLocation } from "react-router-dom";
 import { urlParams } from "shared/config/consts/urlParams";
 import axios from "axios";
 import { createNewAbortController } from "shared/lib/createNewAbortController/createNewAbortController";
+import { Modal } from "shared/ui/Modal/Modal";
+import { FenInput } from "shared/ui/FenInput/FenInput";
 
 interface StockfishOnlineChessboardProps {
   className?: string;
@@ -114,6 +116,7 @@ export const StockfishOnlineChessboard = ({
 
     if (game.game_over() || game.in_draw()) {
       sounds.checkmateSound.play();
+      setIsGameOverModal(true);
       return false;
     }
 
@@ -190,6 +193,20 @@ export const StockfishOnlineChessboard = ({
     return notEnd;
   }
 
+  const handleFenInputChange = (fen: string) => {
+    const { valid } = game.validate_fen(fen);
+    if (valid) {
+      game.load(fen);
+      setGamePosition(game.fen());
+    }
+  };
+
+  const [isGameOverModal, setIsGameOverModal] = useState(false);
+
+  const onToggleModal = useCallback(() => {
+    setIsGameOverModal(!isGameOverModal);
+  }, [isGameOverModal]);
+
   return (
     <div className={classNames(cls.StockfishOnlineChessboard, {}, [className])}>
       <div className={cls.chessboardWrapper}>
@@ -231,7 +248,29 @@ export const StockfishOnlineChessboard = ({
             Назад
           </Button>
         </div>
+        <FenInput fenPosition={gamePosition} onChange={handleFenInputChange} />
       </div>
+      <Modal isOpen={isGameOverModal} onClose={onToggleModal}>
+        <p>Игра окончена!</p>
+        <div className={cls.buttons}>
+          <Button
+            onClick={() => {
+              game.reset();
+              setGamePosition(game.fen());
+              setIsGameOverModal(false);
+            }}
+          >
+            Новая игра
+          </Button>
+          <Button
+            onClick={() => {
+              setIsGameOverModal(false);
+            }}
+          >
+            Назад
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

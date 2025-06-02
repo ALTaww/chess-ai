@@ -28,8 +28,8 @@ export default class Engine {
   private readyPromise: Promise<void>;
   private resolveReady!: () => void;
   private messageCallbacks = new Set<EngineMessageCallback>();
-  private _depth = 5;
-  private _thinkTime = 1000;
+  private _depth: number;
+  private _thinkTime: number;
 
   constructor() {
     this.stockfish = new Worker("./stockfish.js");
@@ -63,7 +63,7 @@ export default class Engine {
   private handleEngineMessage = (e: MessageEvent) => {
     const data: string = e.data;
     // Логируем raw-сообщения (можно отключить в production)
-    console.log("[Engine →]", data);
+    // console.log("[Engine →]", data);
 
     // Распарываем часть UCI-информации
     const msg = this.parseMessage(data);
@@ -247,7 +247,9 @@ export default class Engine {
     this.stockfish.postMessage(`position fen ${fen}`);
 
     // 4) Формируем команду «go»
-    const goCommand = `go depth ${this._depth} movetime ${this._thinkTime}`;
+    let goCommand = `go`;
+    if (this._depth) goCommand += ` depth ${this._depth}`;
+    if (this._thinkTime) goCommand += ` movetime ${this._thinkTime}`;
     console.log(`[Engine ←] ${goCommand}`);
     this.stockfish.postMessage(goCommand);
   }

@@ -9,21 +9,30 @@ import {
   BoardOrientation,
   Piece,
 } from "react-chessboard/dist/chessboard/types";
-import { useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  InputHTMLAttributes,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Chess from "chess.js";
 import { Button } from "shared/ui/Button/Button";
+import { Input } from "shared/ui/Input/Input";
+import { FenInput } from "shared/ui/FenInput/FenInput";
 
 interface ManualBoardEditorProps {
   className?: string;
 }
 
 export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
-  const game = useMemo(() => new Chess("8/8/8/8/8/8/8/8 w - - 0 1"), []); // empty board
+  const game = useMemo(() => new Chess("8/8/8/8/8/8/8/8 w - - 0 1"), []); // пустая доска
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
     "white"
   );
   const [boardWidth, setBoardWidth] = useState(360);
-  const [fenPosition, setFenPosition] = useState(game.fen());
+  const [fenPosition, setFenPosition] = useState<string>(game.fen());
+
   const handleSparePieceDrop = (piece, targetSquare) => {
     const color = piece[0];
     const type = piece[1].toLowerCase();
@@ -37,9 +46,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
     if (success) {
       setFenPosition(game.fen());
     } else {
-      alert(
-        `The board already contains ${color === "w" ? "WHITE" : "BLACK"} KING`
-      );
+      alert(`На доске уже есть ${color === "w" ? "белый" : "черный"} КОРОЛЬ`);
     }
     return success;
   };
@@ -47,7 +54,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
     const color = piece[0];
     const type = piece[1].toLowerCase();
 
-    // this is hack to avoid chess.js bug, which I've fixed in the latest version https://github.com/jhlywa/chess.js/pull/426
+    // это хак, чтобы обойти ошибку chess.js, которая исправлена в последней версии https://github.com/jhlywa/chess.js/pull/426
     game.remove(sourceSquare);
     game.remove(targetSquare);
     const success = game.put(
@@ -64,13 +71,14 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
     game.remove(sourceSquare);
     setFenPosition(game.fen());
   };
-  const handleFenInputChange = (e) => {
-    const fen = e.target.value;
+  const handleFenInputChange = (fen: string) => {
     const { valid } = game.validate_fen(fen);
-    setFenPosition(fen);
+
     if (valid) {
       game.load(fen);
       setFenPosition(game.fen());
+    } else {
+      console.log("Неправильный FEN");
     }
   };
 
@@ -99,12 +107,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
     >
       <ChessboardDnDProvider>
         <div>
-          <div
-            style={{
-              display: "flex",
-              // margin: `${boardWidth / 32}px ${boardWidth / 8}px`
-            }}
-          >
+          <div className={cls.piecesContainer}>
             {pieces.slice(6, 12).map((piece) => (
               <SparePiece
                 key={piece}
@@ -127,12 +130,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
               boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
             }}
           />
-          <div
-            style={{
-              display: "flex",
-              margin: `${boardWidth / 32}px ${boardWidth / 8}px`,
-            }}
-          >
+          <div className={cls.piecesContainer}>
             {pieces.slice(0, 6).map((piece) => (
               <SparePiece
                 key={piece}
@@ -175,11 +173,7 @@ export const ManualBoardEditor = ({ className }: ManualBoardEditorProps) => {
             Flip board 🔁
           </Button>
         </div>
-        <input
-          value={fenPosition}
-          onChange={handleFenInputChange}
-          placeholder="Paste FEN position to start editing"
-        />
+        <FenInput fenPosition={fenPosition} onChange={handleFenInputChange} />
       </ChessboardDnDProvider>
     </div>
   );
