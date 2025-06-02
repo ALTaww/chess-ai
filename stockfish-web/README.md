@@ -2,6 +2,8 @@
 
 Проект представляет собой реализацию движков [Stockfish](https://stockfishchess.org/) и [REST API версии Stockfish online](https://stockfish.online/docs.php), использующую в качестве визуализации пакеты [chess.js](https://www.npmjs.com/package/chess.js?activeTab=readme) и [react-chessboard](https://github.com/Clariity/react-chessboard)
 
+[Сайт для просмотра](https://altaww.github.io/chess-ai/)
+
 Этот проект был запущен с помощью [Create React App](https://github.com/facebook/create-react-app).
 
 Используется методология [feature-sliced design](https://feature-sliced.github.io/documentation/)
