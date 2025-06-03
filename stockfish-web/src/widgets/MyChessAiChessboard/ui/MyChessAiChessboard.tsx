@@ -1,6 +1,6 @@
 import { classNames } from "shared/lib/classNames/classNames";
 import cls from "./MyChessAiChessboard.module.scss";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Chess from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { sounds } from "shared/lib/sounds/sounds";
@@ -8,6 +8,7 @@ import { Modal } from "shared/ui/Modal/Modal";
 import { Button } from "shared/ui/Button/Button";
 import { Piece, Square } from "react-chessboard/dist/chessboard/types";
 import { minimaxRoot } from "../lib/aiLogic";
+import { FenInput } from "shared/ui/FenInput/FenInput";
 
 interface MyChessAiChessboardProps {
   className?: string;
@@ -86,6 +87,14 @@ export const MyChessAiChessboard = ({
     return notEnd;
   }
 
+  const handleFenInputChange = (fen: string) => {
+    const { valid } = game.validate_fen(fen);
+    if (valid) {
+      game.load(fen);
+      setGamePosition(game.fen());
+    }
+  };
+
   return (
     <div className={classNames(cls.MyChessAiChessboard, {}, [className])}>
       <div className={cls.chessboardWrapper}>
@@ -133,7 +142,7 @@ export const MyChessAiChessboard = ({
             Ходи
           </Button>
         </div>
-
+        <FenInput fenPosition={gamePosition} onChange={handleFenInputChange} />
         <div className="info">
           Глубина поиска:
           <select

@@ -105,7 +105,9 @@ export const minimaxRoot = function (
   isMaximisingPlayer: boolean,
   startDate: Date
 ) {
-  const newGameMoves = game.moves();
+  const newGameMoves: string[] = game.moves();
+  if (newGameMoves.length === 0) return;
+  if (newGameMoves.length === 1) return newGameMoves[0];
   let bestMove = isMaximisingPlayer ? -9999 : 9999;
   let bestMoveFound;
   console.log(newGameMoves);

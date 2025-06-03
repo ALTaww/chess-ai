@@ -28,8 +28,8 @@ export const FenInput = ({
     }
   };
 
-  const copy = () => {
-    navigator.clipboard.writeText(fenPosition);
+  const copy = async () => {
+    await navigator.clipboard.writeText(fenPosition);
     console.log("copied");
   };
 
