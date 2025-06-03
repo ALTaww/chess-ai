@@ -1,6 +1,13 @@
 ## Об этом проекте
 
-Проект представляет собой реализацию движков [Stockfish](https://stockfishchess.org/) и [REST API версии Stockfish online](https://stockfish.online/docs.php), использующую в качестве визуализации пакеты [chess.js](https://www.npmjs.com/package/chess.js?activeTab=readme) и [react-chessboard](https://github.com/Clariity/react-chessboard)
+Проект представляет собой реализацию движков [Stockfish](https://stockfishchess.org/) и [REST API версии Stockfish online](https://stockfish.online/docs.php), использующую в качестве визуализации пакеты [chess.js](https://www.npmjs.com/package/chess.js?activeTab=readme) и [react-chessboard](https://github.com/Clariity/react-chessboard).
+
+Также я написал ручной движок, не использующий готовые.
+Работает по принципу:
+
+1. Оценка позиции
+2. Дерево поиска с помощью Minimax
+3. Альфа-бета-обрезка
 
 [Сайт для просмотра](https://altaww.github.io/chess-ai/)
 
