@@ -15,6 +15,16 @@
 
 Используется методология [feature-sliced design](https://feature-sliced.github.io/documentation/)
 
+## О файлах
+
+Файл общения с движком stockfish.js находится в `src/app/stockfish/engine.ts`
+
+Реализации логики приложения находятся в папке `src/widgets/`:
+
+1. `MyChessboard` - Игра со stockfish.js
+2. `StockfishOnlineChessboard` - Игра со stockfish-online
+3. `MyChessAiChessboard` - Minimax, Alpha-beta pruning 
+
 ## Перед установкой
 
 Для того чтобы запустить проект на локальной машине вам необходимо установить [Node.js](https://nodejs.org/en)
